@@ -78,6 +78,14 @@ section{display:flex;flex-direction:column;gap:14px}
 .frame{aspect-ratio:3/4;max-width:100%;background:var(--sunk);overflow:hidden;display:grid;place-items:center;position:relative}
 .frame img{width:100%;height:100%;object-fit:cover;display:block}
 .frame svg{width:58%;height:58%}
+.flip{perspective:1400px;cursor:pointer;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+.flip .card{position:relative;aspect-ratio:3/4;transition:transform .7s cubic-bezier(.2,.7,.2,1);transform-style:preserve-3d}
+.flip.on .card{transform:rotateY(180deg)}
+.flip .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;background:var(--sunk)}
+.flip .face img{width:100%;height:100%;object-fit:cover;display:block}
+.flip .back{transform:rotateY(180deg)}
+.flip .side{position:absolute;left:10px;bottom:10px;padding:3px 8px;background:rgba(0,0,0,.55);color:#fff;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase}
+.fliphint{text-align:center;margin-top:-4px}
 .piece .cap{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .piece .cap div{min-width:0}
 .piece .nm{font-family:var(--display);font-size:1.02rem;line-height:1.2;overflow-wrap:anywhere}
@@ -296,7 +304,7 @@ function ruleVerdict(list,t,occ,taste){
   else if(target-fmean>1.1){sc-=1;neg.push({w:3,t:"troppo informale per l'occasione"})}
   else if(Math.abs(fmean-target)<.5){sc+=.3;pos.push({w:1,t:"in linea con l'occasione"})}
   // volumi
-  const big=list.filter(i=>/oversize|ampi|largo|over\b|baggy|wide/i.test(i.descr||"")),slim=list.filter(i=>/slim|aderent|asciut|stretto|skinny/i.test(i.descr||""));
+  const big=list.filter(i=>/oversize|ampi|largo|over\b|baggy|wide|loose|flare/i.test(i.name+" "+(i.descr||""))),slim=list.filter(i=>/slim|aderent|asciut|stretto|skinny/i.test(i.name+" "+(i.descr||"")));
   if(big.some(i=>i.cat==="top")&&big.some(i=>i.cat==="bottom")){sc-=.7;neg.push({w:2,t:"volumi ampi sia sopra sia sotto"})}
   else if(big.length&&slim.length){sc+=.3;pos.push({w:1,t:"un volume ampio bilanciato da un capo asciutto"})}
   // meteo e tessuti
@@ -305,6 +313,27 @@ function ruleVerdict(list,t,occ,taste){
   if(t<8&&list.some(i=>i.seasons.length===1&&i.seasons[0]==="estate")){sc-=.8;neg.push({w:2,t:"un capo estivo in una giornata fredda"})}
   if(t>=22&&list.some(i=>i.seasons.length&&i.seasons.every(s=>s==="inverno"))){sc-=.8;neg.push({w:2,t:"un capo da pieno inverno con questo caldo"})}
   if(sh&&t<8&&isK(sh,/tela|canvas|sandal|espadrill/i)){sc-=.5;neg.push({w:1,t:"scarpe leggere per il freddo"})}
+  // regole classiche e tendenze
+  const shorts=bot&&isShorts(bot);
+  if(shorts&&t<20){sc-=1.5;neg.push({w:3,t:`pantaloni corti a ${t} °C`})}
+  if(top&&isShortSleeve(top)&&t<17&&!out){sc-=1;neg.push({w:3,t:`maniche corte a ${t} °C`})}
+  if(shorts&&sh&&isK(sh,/chelsea|stival|boot|derby|oxford|stringat/i)){sc-=1.2;neg.push({w:3,t:"stivaletti o scarpe formali con i pantaloni corti"})}
+  else if(shorts&&sh&&isK(sh,/sneaker|mocassin|loafer|espadrill|sandal/i)&&!isK(sh,/gel|running|mid\b|alta/i)){sc+=.3;pos.push({w:1,t:"scarpa bassa e pulita, quella giusta con i corti"})}
+  if(shorts&&sh&&isK(sh,/mid\b|alta|high/i)){sc-=.5;neg.push({w:2,t:"sneaker alta con i corti appesantisce la gamba"})}
+  if(bot&&isK(bot,/felpa|tuta|jogger/i)&&sh&&isK(sh,/derby|oxford|chelsea|stringat|mocassin/i)){sc-=1;neg.push({w:3,t:"pantalone da tuta con scarpe da città"})}
+  if(sh&&isK(sh,/gel|running|dedicate/i)&&occ!=="sport"){sc-=.5;neg.push({w:2,t:"scarpa da corsa fuori dal campo"})}
+  if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/chelsea|stival|boot/i)){sc+=.5;pos.push({w:2,t:"jeans a zampa sopra lo stivaletto, l'abbinamento giusto"})}
+  else if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/sneaker/i)&&!isK(sh,/alta|mid\b/i))tips.push("Il flare rende di più con uno stivaletto: l'orlo deve coprire metà scarpa.");
+  if(bot&&isK(bot,/baggy|loose|wide/i)&&sh&&isK(sh,/derby|mocassin/i)){sc+=.3;pos.push({w:1,t:"pantalone ampio con scarpa importante, molto attuale"})}
+  const warm=list.filter(i=>i.cat!=="shoes"&&["marrone","cammello"].includes(i.color));
+  if(warm.length&&sh&&sh.color==="nero"){sc-=.4;neg.push({w:1,t:"toni caldi con scarpe nere: meglio marrone o bordeaux"})}
+  if(t<18&&list.some(i=>i.cat!=="shoes"&&FAM.terra.includes(i.color))&&!acc.length){sc+=.2;pos.push({w:1,t:"toni terra, i colori di questo inverno"})}
+  const clothCols=new Set(list.filter(i=>i.cat!=="shoes").map(i=>i.color));
+  if(clothCols.size<=3&&uniq.length<=4){sc+=.2;pos.push({w:1,t:"non più di tre colori"})}
+  if(top&&bot&&top.cat==="top"&&lum(bot.color)<lum(top.color)-.15&&!shorts){sc+=.2;pos.push({w:1,t:"sotto più scuro di sopra, la figura resta ancorata"})}
+  if(top&&bot&&isK(top,/polo|rugby/i)&&isK(bot,/chino/i)){sc+=.2;pos.push({w:1,t:"polo e chino, un classico che non sbaglia"})}
+  if(shorts)tips.push("Corti sopra il ginocchio, 3-4 dita: con l'orlo che tocca il ginocchio la gamba si accorcia.");
+  if(shorts&&sh&&isK(sh,/sneaker/i))tips.push("Con i corti calzini invisibili, mai di spugna sopra la caviglia.");
   // gusti
   let lk=0,dk=0;for(let a=0;a<list.length;a++)for(let b=a+1;b<list.length;b++){const v=taste[pk(list[a].id,list[b].id)]||0;if(v>0)lk++;if(v<0)dk++}
   if(lk){sc+=.4;pos.push({w:1,t:"riprende abbinamenti che ti sono piaciuti"})}
@@ -484,7 +513,10 @@ const getItem=id=>S.items.find(i=>i.id===id);
 
 // ===== motore degli abbinamenti =====
 function seasonsFor(t){if(t<10)return["inverno"];if(t<18)return["autunno","primavera","inverno"];if(t<24)return["primavera","autunno","estate"];return["estate"]}
-function cands(cat,t,occ){const ok=seasonsFor(t);return S.items.filter(i=>i.cat===cat&&i.occ.includes(occ)&&i.seasons.some(s=>ok.includes(s)))}
+const isShorts=i=>i.cat==="bottom"&&/bermuda|shorts?\b|pantaloncin|corti/i.test(i.name);
+const isShortSleeve=i=>i.cat==="top"&&/polo|t-?shirt|canotta|maniche corte/i.test(i.name)&&!/rugby|manica lunga|maniche lunghe/i.test(i.name+" "+(i.descr||""));
+const warmOk=(i,t)=>isShorts(i)?t>=20:isShortSleeve(i)?t>=17:true;
+function cands(cat,t,occ){const ok=seasonsFor(t);return S.items.filter(i=>i.cat===cat&&i.occ.includes(occ)&&i.seasons.some(s=>ok.includes(s))&&warmOk(i,t))}
 function fresh(i){const l=lastWorn(i.id);return l?Math.min(diff(l,today()),30):38}
 const pk=(a,b)=>a<b?a+"|"+b:b+"|"+a;
 function pairTaste(){const m={};for(const l of S.looks){if(!l.vote)continue;for(let i=0;i<l.items.length;i++)for(let j=i+1;j<l.items.length;j++){const k=pk(l.items[i],l.items[j]);m[k]=(m[k]||0)+l.vote}}return m}
@@ -629,21 +661,22 @@ function vote(id,v){const l=S.looks.find(x=>x.id===id);if(!l)return;l.vote=l.vot
 function wear(){
   const d=today(),old=S.looks.find(l=>l.date===d);
   const look={id:uid(),date:d,items:cur.list.map(i=>i.id),photo:null,vote:null,stylist:cur.ai||(cur.rv&&{voto:cur.rv.voto,giudizio:cur.rv.giudizio})||null,occ:S.prefs.occ,temp:S.prefs.temp};
-  if(old){dropPhoto(old.photo);S.looks=S.looks.filter(l=>l!==old)}
+  if(old){dropPhoto(old.photo);dropPhoto(old.photoBack);S.looks=S.looks.filter(l=>l!==old)}
   S.looks.push(look);save();render();
   sheet(`<div class="top"><div><span class="lbl">Look salvato</span><h2>Adesso la <em>foto</em></h2></div></div>
-    <p class="note">Una foto a figura intera allo specchio, in piedi e con buona luce. Resta salvata con questo look e la ritrovi nel Lookbook.</p>
+    <p class="note">Una foto a figura intera allo specchio, in piedi e con buona luce. Poi dal Lookbook aggiungi quella da dietro e la giri col dito.</p>
     <div class="row"><label class="btn solid" for="lp">Scatta o scegli la foto</label><input id="lp" type="file" accept="image/*" hidden><button class="btn line" id="later">Più tardi</button></div>`,
     pane=>{pane.querySelector("#later").onclick=closeSheet;pane.querySelector("#lp").onchange=e=>attachLookPhoto(look.id,e.target.files[0])});
 }
 function pickLookPhoto(id){const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=()=>attachLookPhoto(id,i.files[0]);i.click()}
-async function attachLookPhoto(id,file){if(!file)return;const l=S.looks.find(x=>x.id===id);if(!l)return;
-  try{const {blob}=await readImage(file,1400);const old=l.photo;l.photo=await savePhoto(blob);dropPhoto(old);l.ai=null;save();closeSheet();render();openLook(id);toast("Foto salvata nel look");judgeLook(id,blob)}catch(e){toast("Non riesco a leggere questa immagine")}}
+async function attachLookPhoto(id,file,key="photo"){if(!file)return;const l=S.looks.find(x=>x.id===id);if(!l)return;
+  try{const {blob}=await readImage(file,1400);const old=l[key];l[key]=await savePhoto(blob);dropPhoto(old);if(key==="photo")l.ai=null;save();closeSheet();render();openLook(id);
+    if(key==="photo"){toast(l.photoBack?"Foto davanti salvata":"Foto salvata. Aggiungi anche quella da dietro per girarla");judgeLook(id,blob)}else toast("Foto da dietro salvata: tocca la foto per girarla")}catch(e){toast("Non riesco a leggere questa immagine")}}
 function openLook(id){
   const l=S.looks.find(x=>x.id===id);if(!l)return;const its=l.items.map(getItem).filter(Boolean);
   sheet(`<div class="top"><div><span class="lbl">${fmtLong(l.date)}${l.temp!=null?` · ${l.temp}°`:""}</span><h2>${esc(OCCS[l.occ]||"Look")}</h2></div><button class="link" id="x">Chiudi</button></div>
-    ${l.photo&&PH[l.photo]?`<div class="frame big">${img(l.photo)}</div>`:`<div class="frame big">${lookFrame(l).replace(/^<div class="frame">|<\/div>$/g,"")}</div>`}
-    <div class="row"><label class="btn ${l.photo?"line":"solid"} small" for="lp2">${l.photo?"Cambia foto":"Aggiungi la foto"}</label><input id="lp2" type="file" accept="image/*" hidden></div>
+    ${l.photo&&PH[l.photo]&&l.photoBack&&PH[l.photoBack]?`<div class="flip" id="flip" role="button" aria-label="Gira la foto"><div class="card"><div class="face">${img(l.photo)}<span class="side">Davanti</span></div><div class="face back">${img(l.photoBack)}<span class="side">Dietro</span></div></div></div><p class="note fliphint">Tocca o trascina per girare</p>`:l.photo&&PH[l.photo]?`<div class="frame big">${img(l.photo)}</div>`:`<div class="frame big">${lookFrame(l).replace(/^<div class="frame">|<\/div>$/g,"")}</div>`}
+    <div class="row"><label class="btn ${l.photo?"line":"solid"} small" for="lp2">${l.photo?"Cambia davanti":"Aggiungi la foto"}</label><input id="lp2" type="file" accept="image/*" hidden>${l.photo?`<label class="btn ${l.photoBack?"line":"solid"} small" for="lp3">${l.photoBack?"Cambia dietro":"Aggiungi foto da dietro"}</label><input id="lp3" type="file" accept="image/*" hidden>`:""}</div>
     ${voteHTML(l)}
     ${lookAIHTML(l)}
     <div class="fld"><span class="lbl">Capi del look</span><div class="list">${its.map(i=>`<div class="li"><div class="th">${i.photo&&PH[i.photo]?img(i.photo):sil(i.cat,i.color)}</div><div class="tx"><div>${esc(i.name)}</div><div class="note">${CATS[i.cat]}</div></div><div class="num"></div></div>`).join("")||'<p class="muted">I capi di questo look sono stati eliminati.</p>'}</div></div>
@@ -651,9 +684,14 @@ function openLook(id){
     pane=>{openId=id;pane.querySelector("#x").onclick=closeSheet;
       const ja=pane.querySelector("#judge");if(ja)ja.onclick=()=>judgeLook(id);
       pane.querySelector("#lp2").onchange=e=>attachLookPhoto(id,e.target.files[0]);
+      const b3=pane.querySelector("#lp3");if(b3)b3.onchange=e=>attachLookPhoto(id,e.target.files[0],"photoBack");
+      const fl=pane.querySelector("#flip");if(fl){let x0=null,moved=false;const tg=()=>fl.classList.toggle("on");
+        fl.onpointerdown=e=>{x0=e.clientX;moved=false};fl.onpointermove=e=>{if(x0!=null&&Math.abs(e.clientX-x0)>30&&!moved){moved=true;tg()}};
+        fl.onpointerup=()=>{if(x0!=null&&!moved)tg();x0=null};fl.onpointercancel=()=>{x0=null};
+        fl.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg()}};fl.tabIndex=0}
       pane.querySelectorAll("[data-vote]").forEach(b=>b.onclick=()=>vote(id,+b.dataset.vote));
       const d=pane.querySelector("#dl");d.onclick=()=>{if(!d.dataset.a){d.dataset.a=1;d.textContent="Conferma eliminazione";return}
-        dropPhoto(l.photo);S.looks=S.looks.filter(x=>x.id!==id);save();closeSheet();cur=null;render();toast("Look eliminato")}});
+        dropPhoto(l.photo);dropPhoto(l.photoBack);S.looks=S.looks.filter(x=>x.id!==id);save();closeSheet();cur=null;render();toast("Look eliminato")}});
 }
 
 // ===== editor capo =====
@@ -750,7 +788,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
   if(saved&&Array.isArray(saved.items)){S=saved;S.prefs=S.prefs||{temp:12,occ:"casual"};S.looks=S.looks||[]}
   else DB.put("state",S);
   S.looks.forEach(l=>{delete l.aiState;delete l.aiErr});
-  await loadPhotos([...S.items.map(i=>i.photo),...S.looks.map(l=>l.photo)]);
+  await loadPhotos([...S.items.map(i=>i.photo),...S.looks.map(l=>l.photo),...S.looks.map(l=>l.photoBack)]);
   cur=null;render();
   await seedWardrobe();
   initAI();
