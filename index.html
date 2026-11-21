@@ -568,7 +568,8 @@ function generate(){
 }
 function swap(k){
   const {temp:t,occ}=S.prefs,taste=pairTaste(),c=cur.list[k];
-  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id).map(i=>{const l=cur.list.slice();l[k]=i;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
+  const tl0=S.looks.find(l=>l.date===today()),wk=tl0?tl0.items.slice().sort().join(","):null;
+  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id).map(i=>{const l=cur.list.slice();l[k]=i;if(wk&&l.map(x=>x.id).sort().join(",")===wk)return null;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
   if(!opts.length)return toast(`Nessun'altra scelta per "${CATS[c.cat]}" che stia bene con il resto`);
   const p=opts[Math.floor(Math.random()*Math.min(3,opts.length))];cur.list=p.l;cur.notes=p.e.notes;cur.rv=ruleVerdict(p.l,t,occ,taste);cur.cands=[{list:p.l,notes:p.e.notes}];if(cur.ai||cur.aiState){aiCtl&&aiCtl.abort();cur.ai=null;cur.aiState=AI?"stale":null}render();
 }
@@ -760,10 +761,27 @@ async function importItems(file){
   try{data=JSON.parse(await file.text())}catch(e){return toast("Il file non è leggibile")}
   const arr=Array.isArray(data)?data:data&&Array.isArray(data.items)?data.items:null;
   if(!arr)return toast("Questo file non contiene capi");
+  if(data&&data.backup&&Array.isArray(data.looks))return confirmRestore(data,arr);
   let n=0,skip=0,nl=0;
-  if(data&&data.backup&&Array.isArray(data.looks)){S.items.forEach(i=>dropPhoto(i.photo));S.looks.forEach(l=>{dropPhoto(l.photo);dropPhoto(l.photoBack)});S.items=[];S.looks=[]}
   try{const r=await addItems(arr);n=r.n;skip=r.skip;nl=await restoreLooks(data,r.idMap)}catch(e){save();cur=null;render();return toast("Il file è in parte danneggiato: ho importato quello che ho potuto")}if(data.prefs&&nl&&typeof data.prefs==="object"){const t=+data.prefs.temp;if(t>=-5&&t<=38)S.prefs.temp=Math.round(t);if(OCCS[data.prefs.occ])S.prefs.occ=data.prefs.occ}if(+data.seedVer>0)S.seedVer=Math.max(S.seedVer||0,Math.min(+data.seedVer,99));
   save();cur=null;render();toast(n||nl?`${data.backup?"Backup ripristinato: ":""}${n} capi${nl?` e ${nl} look`:""}${data.backup?"":" importati"}${skip?`, ${skip} già presenti o non validi`:""}`:"Nessun capo nuovo nel file");
+}
+function confirmRestore(data,arr){
+  const ok=arr.filter(r=>r&&typeof r==="object"&&clip(r.name||r.nome,60)&&CATS[r.cat||r.categoria]).length;
+  if(!ok)return toast("Questo backup non contiene capi validi: non ho toccato niente");
+  const nl=data.looks.filter(l=>l&&typeof l.date==="string").length;
+  sheet(`<div class="top"><div><span class="lbl">Backup del ${esc(String(data.backup).slice(0,10))}</span><h2>Ripristinare il <em>backup</em>?</h2></div><button class="link" id="x">Annulla</button></div>
+    <p class="note">Sostituisce tutto quello che c'è ora (${S.items.length} capi e ${S.looks.length} look) con il contenuto del backup: ${ok} capi e ${nl} look.</p>
+    <div class="row"><button class="btn solid" id="rs">Ripristina</button></div>`,pane=>{pane.querySelector("#x").onclick=closeSheet;
+    pane.querySelector("#rs").onclick=async()=>{pane.querySelector("#rs").disabled=true;closeSheet();toast("Ripristino in corso…");
+      const old={items:S.items,looks:S.looks};S.items=[];S.looks=[];let n=0,nl2=0;
+      try{const r=await addItems(arr);n=r.n;nl2=await restoreLooks(data,r.idMap)}catch(e){S.items.forEach(i=>dropPhoto(i.photo));S.looks.forEach(l=>{dropPhoto(l.photo);dropPhoto(l.photoBack)});S.items=old.items;S.looks=old.looks;cur=null;render();return toast("Il backup è danneggiato: ho lasciato tutto com'era")}
+      if(!n){S.items=old.items;S.looks=old.looks;cur=null;render();return toast("Il backup non contiene capi validi: non ho toccato niente")}
+      if(data.prefs&&typeof data.prefs==="object"){const t=+data.prefs.temp;if(t>=-5&&t<=38)S.prefs.temp=Math.round(t);if(OCCS[data.prefs.occ])S.prefs.occ=data.prefs.occ}
+      S.seedVer=Math.max(S.seedVer||0,SEED);
+      const ok2=await DB.put("state",S);
+      if(ok2){old.items.forEach(i=>dropPhoto(i.photo));old.looks.forEach(l=>{dropPhoto(l.photo);dropPhoto(l.photoBack)})}
+      cur=null;shown.clear();render();toast(ok2?`Backup ripristinato: ${n} capi e ${nl2} look`:"Ripristinato, ma il telefono non riesce a salvarlo")}});
 }
 async function addItems(arr){
   let n=0,skip=0;const idMap={};
@@ -823,7 +841,7 @@ async function seedWardrobe(){
 
 // ===== foglio e avvisi =====
 let lastFocus=null;
-function sheet(html,setup){if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()}lastFocus=document.activeElement;const r=document.getElementById("sheet");
+function sheet(html,setup){document.querySelectorAll(".toast").forEach(t=>t.remove());if(onSheetClose){const f=onSheetClose;onSheetClose=null;f()}lastFocus=document.activeElement;const r=document.getElementById("sheet");
   r.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t"><div class="pane">${html}</div></div>`;const h2=r.querySelector("h2");if(h2)h2.id="sh-t";
   const s=r.firstChild;s.addEventListener("click",e=>{if(e.target===s)closeSheet()});setup&&setup(s.querySelector(".pane"));
   const f=s.querySelector("#x")||s.querySelector("button,input:not([hidden])");f&&f.focus({preventScroll:true})}
