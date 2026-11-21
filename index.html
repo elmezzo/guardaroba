@@ -583,7 +583,7 @@ function vOggi(){
     ${cur.ai||cur.rv?`<details class="rules"><summary class="link">Le regole applicate</summary><ul class="why">${reasons().map(r=>`<li class="${r.w?"w":""}">${esc(r.t)}</li>`).join("")}</ul></details>`:`<ul class="why">${reasons().map(r=>`<li class="${r.w?"w":""}">${esc(r.t)}</li>`).join("")}</ul>`}
     <div class="row"><button class="btn solid" id="wear">${tl?"Sostituisci il look di oggi":"Lo indosso oggi"}</button><button class="btn line" id="regen">Un'altra proposta</button></div>`;
   return `<header class="head"><span class="lbl">${fmtLong(today())}</span><h1>Cosa <em>indossare</em></h1></header>
-  ${tl?`<section><span class="lbl">Il look di oggi</span><div class="today"><button class="look" data-open="${tl.id}" aria-label="Apri il look di oggi">${lookFrame(tl)}</button><div class="tx"><h3>${tl.items.map(getItem).filter(Boolean).map(i=>esc(i.name)).join(", ")}</h3>${tl.photo?"":`<button class="btn small" data-photo="${tl.id}">Aggiungi la foto</button>`}${voteHTML(tl)}</div></div></section>`:""}
+  ${tl?`<section><span class="lbl">Il look di oggi</span><div class="today"><button class="look" data-open="${tl.id}" aria-label="Apri il look di oggi">${lookFrame(tl)}</button><div class="tx"><h3>${tl.items.map(getItem).filter(Boolean).map(i=>esc(i.name)).join(", ")}</h3>${tl.photo?"":`<button class="btn small" data-photo="${tl.id}">Aggiungi la foto</button>`}${voteHTML(tl)}<button class="link" data-del="${tl.id}">Elimina questo look</button></div></div></section>`:""}
   <section class="ctl">
     <div class="f"><span class="lbl">Temperatura</span><div class="temp"><input type="range" id="temp" min="-5" max="38" value="${p.temp}" aria-label="Temperatura prevista in gradi"><output id="tout">${p.temp}°</output></div></div>
     <div class="f"><span class="lbl">Occasione</span><div class="opts">${Object.entries(OCCS).map(([k,v])=>`<label class="opt"><input type="radio" name="occ" value="${k}" ${p.occ===k?"checked":""}>${v}</label>`).join("")}</div></div>
@@ -637,6 +637,7 @@ function bind(){
   $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
   $$("[data-open]").forEach(b=>b.onclick=()=>openLook(b.dataset.open));
   $$("[data-photo]").forEach(b=>b.onclick=()=>pickLookPhoto(b.dataset.photo));
+  $$("[data-del]").forEach(b=>b.onclick=()=>{if(b.dataset.a!=="1"){b.dataset.a="1";b.textContent="Tocca di nuovo per eliminare";setTimeout(()=>{if(b.isConnected){b.dataset.a="";b.textContent="Elimina questo look"}},4000);return}deleteLook(b.dataset.del)});
   $$("[data-vote]").forEach(b=>b.onclick=()=>vote(b.dataset.look,+b.dataset.vote));
   if(tab==="oggi"){
     const r=$("#temp");if(r){r.oninput=()=>$("#tout").textContent=r.value+"°";r.onchange=()=>{S.prefs.temp=+r.value;save();shown.clear();cur=null;render()}}
@@ -664,20 +665,24 @@ function vote(id,v){const l=S.looks.find(x=>x.id===id);if(!l)return;l.vote=l.vot
 function wear(){
   const d=today(),old=S.looks.find(l=>l.date===d);
   const look={id:uid(),date:d,items:cur.list.map(i=>i.id),photo:null,vote:null,stylist:cur.ai||(cur.rv&&{voto:cur.rv.voto,giudizio:cur.rv.giudizio})||null,occ:S.prefs.occ,temp:S.prefs.temp};
-  if(old){dropPhoto(old.photo);dropPhoto(old.photoBack);S.looks=S.looks.filter(l=>l!==old)}
+  if(old)S.looks=S.looks.filter(l=>l!==old);
   S.looks.push(look);save();render();
+  const keep=()=>{if(old){dropPhoto(old.photo);dropPhoto(old.photoBack)}};
   sheet(`<div class="top"><div><span class="lbl">Look salvato</span><h2>Adesso la <em>foto</em></h2></div></div>
     <p class="note">Una foto a figura intera allo specchio, in piedi e con buona luce. Poi dal Lookbook aggiungi quella da dietro e la giri col dito.</p>
-    <div class="row"><label class="btn solid" for="lp">Scatta o scegli la foto</label><input id="lp" type="file" accept="image/*" hidden><button class="btn line" id="later">Più tardi</button></div>`,
-    pane=>{pane.querySelector("#later").onclick=closeSheet;pane.querySelector("#lp").onchange=e=>attachLookPhoto(look.id,e.target.files[0])});
+    <div class="row"><label class="btn solid" for="lp">Scatta o scegli la foto</label><input id="lp" type="file" accept="image/*" hidden><button class="btn line" id="later">Più tardi</button></div>
+    <button class="link" id="undo">Annulla, non lo indosso</button>`,
+    pane=>{pane.querySelector("#later").onclick=()=>{keep();closeSheet()};pane.querySelector("#lp").onchange=e=>{keep();attachLookPhoto(look.id,e.target.files[0])};
+      pane.querySelector("#undo").onclick=()=>{S.looks=S.looks.filter(l=>l!==look);if(old)S.looks.push(old);save();closeSheet();cur=null;render();toast(old?"Ripristinato il look di prima":"Look annullato")}});
 }
 function pickLookPhoto(id){const i=document.createElement("input");i.type="file";i.accept="image/*";i.onchange=()=>attachLookPhoto(id,i.files[0]);i.click()}
 async function attachLookPhoto(id,file,key="photo"){if(!file)return;const l=S.looks.find(x=>x.id===id);if(!l)return;
   try{const {blob}=await readImage(file,1400);const old=l[key];l[key]=await savePhoto(blob);dropPhoto(old);if(key==="photo")l.ai=null;save();closeSheet();render();openLook(id);
     if(key==="photo"){toast(l.photoBack?"Foto davanti salvata":"Foto salvata. Aggiungi anche quella da dietro per girarla");judgeLook(id,blob)}else toast("Foto da dietro salvata: tocca la foto per girarla")}catch(e){toast("Non riesco a leggere questa immagine")}}
+function deleteLook(id){const l=S.looks.find(x=>x.id===id);if(!l)return;dropPhoto(l.photo);dropPhoto(l.photoBack);S.looks=S.looks.filter(x=>x.id!==id);save();closeSheet();cur=null;render();toast("Look eliminato")}
 function openLook(id){
   const l=S.looks.find(x=>x.id===id);if(!l)return;const its=l.items.map(getItem).filter(Boolean);
-  sheet(`<div class="top"><div><span class="lbl">${fmtLong(l.date)}${l.temp!=null?` · ${l.temp}°`:""}</span><h2>${esc(OCCS[l.occ]||"Look")}</h2></div><button class="link" id="x">Chiudi</button></div>
+  sheet(`<div class="top"><div><span class="lbl">${fmtLong(l.date)}${l.temp!=null?` · ${l.temp}°`:""}</span><h2>${esc(OCCS[l.occ]||"Look")}</h2></div><div class="row"><button class="link" id="dl0">Elimina</button><button class="link" id="x">Chiudi</button></div></div>
     ${l.photo&&PH[l.photo]&&l.photoBack&&PH[l.photoBack]?`<div class="flip" id="flip" role="button" aria-label="Gira la foto"><div class="card"><div class="face">${img(l.photo)}<span class="side">Davanti</span></div><div class="face back">${img(l.photoBack)}<span class="side">Dietro</span></div></div></div><p class="note fliphint">Tocca o trascina per girare</p>`:l.photo&&PH[l.photo]?`<div class="frame big">${img(l.photo)}</div>`:`<div class="frame big">${lookFrame(l).replace(/^<div class="frame">|<\/div>$/g,"")}</div>`}
     <div class="row"><label class="btn ${l.photo?"line":"solid"} small" for="lp2">${l.photo?"Cambia davanti":"Aggiungi la foto"}</label><input id="lp2" type="file" accept="image/*" hidden>${l.photo?`<label class="btn ${l.photoBack?"line":"solid"} small" for="lp3">${l.photoBack?"Cambia dietro":"Aggiungi foto da dietro"}</label><input id="lp3" type="file" accept="image/*" hidden>`:""}</div>
     ${voteHTML(l)}
@@ -694,7 +699,8 @@ function openLook(id){
         fl.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg()}};fl.tabIndex=0}
       pane.querySelectorAll("[data-vote]").forEach(b=>b.onclick=()=>vote(id,+b.dataset.vote));
       const d=pane.querySelector("#dl");d.onclick=()=>{if(!d.dataset.a){d.dataset.a=1;d.textContent="Conferma eliminazione";return}
-        dropPhoto(l.photo);dropPhoto(l.photoBack);S.looks=S.looks.filter(x=>x.id!==id);save();closeSheet();cur=null;render();toast("Look eliminato")}});
+        deleteLook(id)};
+      const d0=pane.querySelector("#dl0");d0.onclick=()=>{if(!d0.dataset.a){d0.dataset.a=1;d0.textContent="Conferma";return}deleteLook(id)}});
 }
 
 // ===== editor capo =====
