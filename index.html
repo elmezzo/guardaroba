@@ -317,6 +317,11 @@ function ruleVerdict(list,t,occ,taste){
   const big=list.filter(i=>/oversize|ampi|largo|over\b|baggy|wide|loose|flare/i.test(i.name+" "+(i.descr||""))),slim=list.filter(i=>/slim|aderent|asciut|stretto|skinny/i.test(i.name+" "+(i.descr||"")));
   if(big.some(i=>i.cat==="top")&&big.some(i=>i.cat==="bottom")){sc-=.7;neg.push({d:-.7,w:2,t:"volumi ampi sia sopra sia sotto"})}
   else if(big.length&&slim.length){sc+=.3;pos.push({d:+.3,w:1,t:"un volume ampio bilanciato da un capo asciutto"})}
+  // strati
+  const lay=layerOf(list);
+  if(lay&&top&&top!==lay){sc+=.3;pos.push({d:+.3,w:2,t:`${lay.name} aperta sopra la maglietta, un gioco di strati`});
+    const dl=Math.abs(lum(lay.color)-lum(top.color));if(dl<.08&&lay.color!==top.color)tips.push("Camicia e maglietta quasi dello stesso tono: un po' più di stacco le farebbe leggere come due strati.");
+    if(t>=27){sc-=.6;neg.push({d:-.6,w:2,t:`due strati sopra a ${t} °C`})}}
   // meteo e tessuti
   if(t<16&&!out){sc-=t<8?2:1.2;capV=t<8?5:6;capWhy=`senza capospalla sotto i ${t<8?8:16} °C il voto non supera ${capV}`;neg.push({d:t<8?-2:-1.2,w:4,t:`a ${t} °C manca un capospalla`});if(!S.items.some(i=>i.cat==="outer"))tips.unshift("Non hai ancora capispalla nell'armadio: aggiungine uno e lo inserisco nelle proposte.")}
   if(t>=24&&out){sc-=.8;neg.push({d:-.8,w:2,t:"il capospalla è di troppo con questo caldo"})}
@@ -540,6 +545,8 @@ function seasonsFor(t){if(t<10)return["inverno","autunno"];if(t<18)return["autun
 const OCC_FB={elegante:["lavoro","casual"],lavoro:["elegante","casual"],sport:["casual"],casual:["sport"]};let fbUsed=new Set();
 const isShorts=i=>i.cat==="bottom"&&/bermuda|shorts?\b|pantaloncin|corti/i.test(i.name);
 const isShortSleeve=i=>i.cat==="top"&&/polo|t-?shirt|canotta|maniche corte/i.test(i.name)&&!/rugby|manica lunga|maniche lunghe/i.test(i.name+" "+(i.descr||""));
+const isTee=i=>i.cat==="top"&&!i.layer&&/t-?shirt|maglietta|canotta|\btee\b/i.test(i.name);
+const layerOf=list=>{const tops=list.filter(i=>i.cat==="top");return tops.length>1?tops.find(i=>i.layer)||tops[1]:null};
 const isHeavy=i=>/manica lunga|maniche lunghe|rugby|felpa|flanella|cashmere|lana|dolcevita|maglion|velluto/i.test(i.name+" "+(i.descr||""));
 const warmOk=(i,t)=>isShorts(i)?t>=20:isShortSleeve(i)?t>=17:true;
 const coolOk=(i,t)=>!(t>=26&&(isHeavy(i)||(i.cat==="shoes"&&/chelsea|stival|boot/i.test(i.name))));
@@ -570,11 +577,12 @@ function generate(){
   const tl0=S.looks.find(l=>l.date===today()),worn=new Set(tl0?tl0.items:[]),wornKey=tl0?tl0.items.slice().sort().join(","):null;
   const T=pickTop(cands("top",t,occ),8),B=pickTop(cands("bottom",t,occ),8),D=pickTop(cands("dress",t,occ),6),Sh=pickTop(cands("shoes",t,occ),6),O=pickTop(cands("outer",t,occ),5);
   const needO=t<16,bases=[];for(const a of T)for(const b of B)bases.push([a,b]);for(const d of D)bases.push([d]);
+  if(occ==="casual"&&t>=17&&t<30){const Ly=pickTop(cands("top",t,occ,false).filter(i=>i.layer),4),Te=pickTop(cands("top",t,occ,false).filter(isTee),4);for(const a of Te)for(const l of Ly)for(const b of B.slice(0,5))bases.push([a,l,b])}
   const all=[];
   for(const base of bases)for(const s of Sh)for(const o of(needO&&O.length?O:[null])){
     const list=[...base,s,...(o?[o]:[])],e=evaluate(list,taste);if(!e)continue;
     const key=list.map(i=>i.id).sort().join(",");if(key===wornKey)continue;
-    const sc=e.s+Math.random()*12-(shown.has(key)?60:0)-list.filter(i=>worn.has(i.id)).length*10;
+    const ly=layerOf(list),sc=e.s-(ly?fresh(ly):0)+Math.random()*12-(shown.has(key)?60:0)-list.filter(i=>worn.has(i.id)).length*10;
     all.push({list,sc,notes:e.notes,key})}
   all.sort((a,b)=>b.sc-a.sc);
   const ranked=all.slice(0,15).map(x=>{const rv=ruleVerdict(x.list,t,occ,taste);return {...x,rv,f:x.sc+rv.raw*6}}).sort((a,b)=>b.f-a.f);
@@ -587,7 +595,8 @@ function generate(){
 function swap(k){
   const {temp:t,occ}=S.prefs,taste=pairTaste(),c=cur.list[k];
   const tl0=S.looks.find(l=>l.date===today()),wk=tl0?tl0.items.slice().sort().join(","):null;
-  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id).map(i=>{const l=cur.list.slice();l[k]=i;if(wk&&l.map(x=>x.id).sort().join(",")===wk)return null;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
+  const lay0=layerOf(cur.list),role=c.cat!=="top"||!lay0?"":c===lay0?"layer":"base";
+  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id&&!cur.list.includes(i)&&(role==="layer"?i.layer:role==="base"?isTee(i):true)).map(i=>{const l=cur.list.slice();l[k]=i;if(wk&&l.map(x=>x.id).sort().join(",")===wk)return null;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
   if(!opts.length)return toast(`Nessun'altra scelta per "${CATS[c.cat]}" che stia bene con il resto`);
   const p=opts[Math.floor(Math.random()*Math.min(3,opts.length))];cur.list=p.l;cur.notes=p.e.notes;cur.rv=ruleVerdict(p.l,t,occ,taste);cur.cands=[{list:p.l,notes:p.e.notes}];if(cur.ai||cur.aiState){aiCtl&&aiCtl.abort();cur.ai=null;cur.aiState=AI?"stale":null}render();
 }
@@ -609,7 +618,7 @@ function vOggi(){
   const p=S.prefs,tl=S.looks.find(l=>l.date===today());
   let body;
   if(cur.empty)body=`<div class="empty"><h3>Manca qualcosa</h3><p class="note">Per ${p.temp} °C e un'occasione "${OCCS[p.occ].toLowerCase()}" non trovo ${cur.miss.join(", ")}. Aggiungilo all'armadio oppure cambia temperatura o occasione.</p><button class="btn line small" data-go="armadio">Vai all'armadio</button></div>`;
-  else body=`<div class="pieces${cur.aiState==="loading"||cur.aiState==="queued"?" pending":""}">${cur.list.map((i,k)=>`<div class="piece">${frame(i)}<div class="cap"><div><div class="lbl">${CATS[i.cat]}</div><div class="nm">${esc(i.name)}</div><div class="mt"><span class="dot" style="background:${swatchCss(i.color)}"></span>${lastTxt(i.id)}</div></div><button class="swap" data-swap="${k}" aria-label="Cambia ${esc(i.name)}">Cambia</button></div></div>`).join("")}</div>
+  else body=`<div class="pieces${cur.aiState==="loading"||cur.aiState==="queued"?" pending":""}">${cur.list.map((i,k)=>`<div class="piece">${frame(i)}<div class="cap"><div><div class="lbl">${i.cat==="top"&&i===layerOf(cur.list)?"Sopra, aperta":CATS[i.cat]}</div><div class="nm">${esc(i.name)}</div><div class="mt"><span class="dot" style="background:${swatchCss(i.color)}"></span>${lastTxt(i.id)}</div></div><button class="swap" data-swap="${k}" aria-label="Cambia ${esc(i.name)}">Cambia</button></div></div>`).join("")}</div>
     ${stylistHTML(cur)}
     ${cur.ai||cur.rv?`<details class="rules"><summary class="link">Le regole applicate</summary><ul class="why">${reasons().map(r=>`<li class="${r.w?"w":""}">${esc(r.t)}</li>`).join("")}</ul></details>`:`<ul class="why">${reasons().map(r=>`<li class="${r.w?"w":""}">${esc(r.t)}</li>`).join("")}</ul>`}
     <div class="row"><button class="btn solid" id="wear">${tl?"Sostituisci il look di oggi":"Lo indosso oggi"}</button><button class="btn line" id="regen">Un'altra proposta</button></div>`;
@@ -815,7 +824,7 @@ async function addItems(arr){
     let photo=null;
     if(typeof r.photo==="string"&&r.photo.startsWith("data:image/")){try{const[h,d]=r.photo.split(","),bin=atob(d),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);photo=await savePhoto(new Blob([u],{type:h.slice(5).split(";")[0]}))}catch(e){}}
     const nid=uid();if(r.id)idMap[r.id]=nid;
-    S.items.push({id:nid,name,cat,color,seasons:seasons.length?seasons:[...SEASONS],occ:occ.length?occ:["casual"],price:+r.price>0?+r.price:"",descr:clip(r.descr||r.descrizione,120),photo,source:src,brand:clip(r.brand,40)});n++;
+    S.items.push({id:nid,name,cat,color,seasons:seasons.length?seasons:[...SEASONS],occ:occ.length?occ:["casual"],price:+r.price>0?+r.price:"",descr:clip(r.descr||r.descrizione,120),photo,source:src,brand:clip(r.brand,40),...(r.layer==="aperta"&&cat==="top"?{layer:"aperta"}:{})});n++;
   }
   return {n,skip,idMap};
 }
@@ -847,7 +856,7 @@ async function restoreLooks(data,idMap){let n=0;if(!Array.isArray(data.looks))re
   return n}
 
 // ===== guardaroba di Alessandro, incluso nell'app =====
-const SEED=1;
+const SEED=2;
 async function seedWardrobe(){
   if((S.seedVer||0)>=SEED)return;
   let data;try{const r=await fetch("guardaroba.json?v="+SEED,{cache:"no-store"});if(!r.ok)return;data=await r.json()}catch(e){return}
