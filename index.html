@@ -181,6 +181,12 @@ input[type=text]:focus,input[type=number]:focus{outline:none;border-bottom-color
 .stylist .sc{display:flex;align-items:flex-start;gap:16px}
 .stylist .sc b{font:400 2.8rem/1 var(--display);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stylist .sc b small{font-size:1rem;color:var(--muted)}
+.score ul{list-style:none;margin:6px 0 0;padding:0;font-size:.88rem}
+.score li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-top:1px solid var(--line)}
+.score li b{font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
+.score li.up b{color:var(--good)}.score li.dn b{color:var(--bad)}
+.score li.tot{border-top:1px solid var(--fg)}.score li.tot span,.score li.cap span{color:var(--muted)}
+.score li.cap b{font:400 1.1rem/1 var(--display)}
 .stylist q{font:italic 400 1.15rem/1.45 var(--display);quotes:"\201C" "\201D"}
 .stylist .wait{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.92rem}
 .stylist .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -276,74 +282,74 @@ function lum(c){const h=COLORS[c];if(!h||h==="pattern")return .5;const r=parseIn
 const has=(l,re)=>l.some(i=>re.test(i.name+" "+(i.descr||"")));
 const isK=(i,re)=>re.test(i.name+" "+(i.descr||""));
 function ruleVerdict(list,t,occ,taste){
-  const pos=[],neg=[],tips=[];let sc=5.6,capV=10;const art=c=>{const n=cname(c);return(/^[aeiou]/i.test(n)?"l'":"il ")+n};
+  const pos=[],neg=[],tips=[];let sc=5.5,capV=10,capWhy=null;const art=c=>{const n=cname(c);return(/^[aeiou]/i.test(n)?"l'":"il ")+n};
   const by=c=>list.find(i=>i.cat===c),top=by("top")||by("dress"),bot=by("bottom"),sh=by("shoes"),out=by("outer");
   const cols=list.map(i=>i.color),uniq=[...new Set(cols)],acc=uniq.filter(c=>!NEUTRAL.has(c));
   // colori
   const fams=new Set(list.filter(i=>i.cat!=="shoes").map(i=>famOf(i.color)));
   const dd=list.filter(i=>i.color==="denim"&&i.cat!=="shoes").length>=2;
   const lums=list.filter(i=>i.cat!=="shoes").map(i=>lum(i.color)),spread=Math.max(...lums)-Math.min(...lums);let tonal=false;
-  if(!dd&&fams.size===1&&!fams.has(undefined)&&list.length>=3&&spread<.3){tonal=true;sc+=1;pos.push({w:3,t:`tono su tono nei ${[...fams][0]==="grigi"?"neri, bianchi e grigi":[...fams][0]==="terra"?"colori della terra":[...fams][0]}`})}
-  else if(!acc.length){sc+=.5;pos.push({w:2,t:"palette tutta neutra"})}
-  if(acc.length===1){const a=list.find(i=>i.color===acc[0]);if(a&&(a.cat==="top"||a.cat==="outer")){sc+=.5;pos.push({w:2,t:`un solo colore deciso, ${art(acc[0])}, vicino al viso`})}else{pos.push({w:1,t:`un solo colore deciso, ${art(acc[0])}`})}}
-  if(uniq.length>=5){sc-=.8;neg.push({w:2,t:"troppi colori diversi"})}
-  if(cols.includes("nero")&&cols.includes("navy")){sc-=.8;neg.push({w:2,t:"nero e blu navy si confondono"})}
-  if(cols.includes("nero")&&cols.includes("marrone")){sc-=.6;neg.push({w:2,t:"nero e marrone insieme stridono"})}
-  if(list.filter(i=>i.color==="denim"&&i.cat!=="shoes").length>=2){sc-=.6;neg.push({w:2,t:"denim su denim"})}
-  if(cols.filter(c=>c==="fantasia").length===1){sc+=.3;pos.push({w:1,t:"una sola fantasia, il resto in tinta unita"})}
+  if(!dd&&fams.size===1&&!fams.has(undefined)&&list.length>=3&&spread<.3){tonal=true;sc+=1;pos.push({d:+1,w:3,t:`tono su tono nei ${[...fams][0]==="grigi"?"neri, bianchi e grigi":[...fams][0]==="terra"?"colori della terra":[...fams][0]}`})}
+  else if(!acc.length){sc+=.5;pos.push({d:+.5,w:2,t:"palette tutta neutra"})}
+  if(acc.length===1){const a=list.find(i=>i.color===acc[0]);if(a&&(a.cat==="top"||a.cat==="outer")){sc+=.5;pos.push({d:+.5,w:2,t:`un solo colore deciso, ${art(acc[0])}, vicino al viso`})}else{pos.push({w:1,t:`un solo colore deciso, ${art(acc[0])}`})}}
+  if(uniq.length>=5){sc-=.8;neg.push({d:-.8,w:2,t:"troppi colori diversi"})}
+  if(cols.includes("nero")&&cols.includes("navy")){sc-=.8;neg.push({d:-.8,w:2,t:"nero e blu navy si confondono"})}
+  if(cols.includes("nero")&&cols.includes("marrone")){sc-=.6;neg.push({d:-.6,w:2,t:"nero e marrone insieme stridono"})}
+  if(list.filter(i=>i.color==="denim"&&i.cat!=="shoes").length>=2){sc-=.6;neg.push({d:-.6,w:2,t:"denim su denim"})}
+  if(cols.filter(c=>c==="fantasia").length===1){sc+=.3;pos.push({d:+.3,w:1,t:"una sola fantasia, il resto in tinta unita"})}
   if(top&&bot&&top.cat==="top"){const d=Math.abs(lum(top.color)-lum(bot.color));
-    if(d<.12&&top.color!==bot.color){sc+=.3;pos.push({w:1,t:"continuità di colore tra sopra e sotto, che slancia"})}
+    if(d<.12&&top.color!==bot.color){sc+=.3;pos.push({d:+.3,w:1,t:"continuità di colore tra sopra e sotto, che slancia"})}
     else if(top.color===bot.color&&top.color!=="denim"){pos.push({w:1,t:"effetto colonna con sopra e sotto uguali"})}
     else if(d>.55&&!tonal)tips.push("Il contrasto netto tra sopra e sotto taglia la figura in due: scarpe in tono con il pantalone lo ammorbidiscono.")}
-  if(sh&&bot){if(sh.color===bot.color&&sh.color!=="nero"){sc+=.3;pos.push({w:1,t:"scarpe in tono con il pantalone"})}
-    if(sh.color==="marrone"&&["grigio","navy","beige","denim","oliva"].includes(bot.color)){sc+=.3;pos.push({w:1,t:"marrone ai piedi, classico con "+art(bot.color)})}}
+  if(sh&&bot){if(sh.color===bot.color&&sh.color!=="nero"){sc+=.3;pos.push({d:+.3,w:1,t:"scarpe in tono con il pantalone"})}
+    if(sh.color==="marrone"&&["grigio","navy","beige","denim","oliva"].includes(bot.color)){sc+=.3;pos.push({d:+.3,w:1,t:"marrone ai piedi, classico con "+art(bot.color)})}}
   // formalità
   const fs=list.map(formality),fmin=Math.min(...fs),fmax=Math.max(...fs),fmean=fs.reduce((a,b)=>a+b)/fs.length,target=FORM_OCC[occ]??2.5;
   const hiLo=occ==="casual"&&out&&isK(out,/blazer|giacca(?! di jeans)/i)&&bot&&isK(bot,/jeans/i);
-  if(hiLo){sc+=.4;pos.push({w:2,t:"il gioco alto-basso tra giacca e jeans"})}
-  else if(fmax-fmin<=1.2){sc+=.5;pos.push({w:2,t:"capi dello stesso livello di formalità"})}
-  else if(fmax-fmin>=2.2){sc-=1;const lo=list[fs.indexOf(fmin)],hi=list[fs.indexOf(fmax)];neg.push({w:3,t:`stacco di formalità tra ${lo.name} e ${hi.name}`})}
-  if(fmean-target>1.1){sc-=.8;neg.push({w:2,t:"un po' troppo formale per l'occasione"})}
-  else if(target-fmean>1.1){sc-=1;neg.push({w:3,t:"troppo informale per l'occasione"})}
-  else if(Math.abs(fmean-target)<.5){sc+=.3;pos.push({w:1,t:"in linea con l'occasione"})}
+  if(hiLo){sc+=.4;pos.push({d:+.4,w:2,t:"il gioco alto-basso tra giacca e jeans"})}
+  else if(fmax-fmin<=1.2){sc+=.5;pos.push({d:+.5,w:2,t:"capi dello stesso livello di formalità"})}
+  else if(fmax-fmin>=2.2){sc-=1;const lo=list[fs.indexOf(fmin)],hi=list[fs.indexOf(fmax)];neg.push({d:-1,w:3,t:`stacco di formalità tra ${lo.name} e ${hi.name}`})}
+  if(fmean-target>1.1){sc-=.8;neg.push({d:-.8,w:2,t:"un po' troppo formale per l'occasione"})}
+  else if(target-fmean>1.1){sc-=1;neg.push({d:-1,w:3,t:"troppo informale per l'occasione"})}
+  else if(Math.abs(fmean-target)<.5){sc+=.3;pos.push({d:+.3,w:1,t:"in linea con l'occasione"})}
   // volumi
   const big=list.filter(i=>/oversize|ampi|largo|over\b|baggy|wide|loose|flare/i.test(i.name+" "+(i.descr||""))),slim=list.filter(i=>/slim|aderent|asciut|stretto|skinny/i.test(i.name+" "+(i.descr||"")));
-  if(big.some(i=>i.cat==="top")&&big.some(i=>i.cat==="bottom")){sc-=.7;neg.push({w:2,t:"volumi ampi sia sopra sia sotto"})}
-  else if(big.length&&slim.length){sc+=.3;pos.push({w:1,t:"un volume ampio bilanciato da un capo asciutto"})}
+  if(big.some(i=>i.cat==="top")&&big.some(i=>i.cat==="bottom")){sc-=.7;neg.push({d:-.7,w:2,t:"volumi ampi sia sopra sia sotto"})}
+  else if(big.length&&slim.length){sc+=.3;pos.push({d:+.3,w:1,t:"un volume ampio bilanciato da un capo asciutto"})}
   // meteo e tessuti
-  if(t<16&&!out){sc-=t<8?2:1.2;capV=t<8?5:6;neg.push({w:4,t:`a ${t} °C manca un capospalla`});if(!S.items.some(i=>i.cat==="outer"))tips.unshift("Non hai ancora capispalla nell'armadio: aggiungine uno e lo inserisco nelle proposte.")}
-  if(t>=24&&out){sc-=.8;neg.push({w:2,t:"il capospalla è di troppo con questo caldo"})}
-  if(t<8&&list.some(i=>i.seasons.length===1&&i.seasons[0]==="estate")){sc-=.8;neg.push({w:2,t:"un capo estivo in una giornata fredda"})}
-  if(t>=22&&list.some(i=>i.seasons.length&&i.seasons.every(s=>s==="inverno"))){sc-=.8;neg.push({w:2,t:"un capo da pieno inverno con questo caldo"})}
-  if(sh&&t<8&&isK(sh,/tela|canvas|sandal|espadrill/i)){sc-=.5;neg.push({w:1,t:"scarpe leggere per il freddo"})}
+  if(t<16&&!out){sc-=t<8?2:1.2;capV=t<8?5:6;capWhy=`senza capospalla sotto i ${t<8?8:16} °C il voto non supera ${capV}`;neg.push({d:t<8?-2:-1.2,w:4,t:`a ${t} °C manca un capospalla`});if(!S.items.some(i=>i.cat==="outer"))tips.unshift("Non hai ancora capispalla nell'armadio: aggiungine uno e lo inserisco nelle proposte.")}
+  if(t>=24&&out){sc-=.8;neg.push({d:-.8,w:2,t:"il capospalla è di troppo con questo caldo"})}
+  if(t<8&&list.some(i=>i.seasons.length===1&&i.seasons[0]==="estate")){sc-=.8;neg.push({d:-.8,w:2,t:"un capo estivo in una giornata fredda"})}
+  if(t>=22&&list.some(i=>i.seasons.length&&i.seasons.every(s=>s==="inverno"))){sc-=.8;neg.push({d:-.8,w:2,t:"un capo da pieno inverno con questo caldo"})}
+  if(sh&&t<8&&isK(sh,/tela|canvas|sandal|espadrill/i)){sc-=.5;neg.push({d:-.5,w:1,t:"scarpe leggere per il freddo"})}
   // regole classiche e tendenze
   const shorts=bot&&isShorts(bot);
-  if(shorts&&t<20){sc-=1.5;neg.push({w:3,t:`pantaloni corti a ${t} °C`})}
-  if(t>=26&&top&&isHeavy(top)){sc-=1.2;if(t>=30)capV=Math.min(capV,6);neg.push({w:3,t:`maniche lunghe e tessuto pesante a ${t} °C`})}
-  if(t>=28&&occ==="casual"&&bot&&isK(bot,/jeans/i)&&!shorts&&S.items.some(isShorts)){sc-=.6;neg.push({w:2,t:`jeans lunghi a ${t} °C, con i corti staresti meglio`})}
-  if(t>=28&&bot&&isK(bot,/felpa|jogger|tuta(?!.*bermuda)/i)&&!shorts){sc-=.8;neg.push({w:2,t:`pantalone in felpa con questo caldo`})}
-  if(top&&isShortSleeve(top)&&t<17&&!out){sc-=1;neg.push({w:3,t:`maniche corte a ${t} °C`})}
-  if(shorts&&sh&&isK(sh,/chelsea|stival|boot|derby|oxford|stringat/i)){sc-=1.2;neg.push({w:3,t:"stivaletti o scarpe formali con i pantaloni corti"})}
-  else if(shorts&&sh&&isK(sh,/sneaker|mocassin|loafer|espadrill|sandal/i)&&!isK(sh,/gel|running|mid\b|alta/i)){sc+=.3;pos.push({w:1,t:"scarpa bassa e pulita, quella giusta con i corti"})}
-  if(shorts&&sh&&isK(sh,/mid\b|alta|high/i)){sc-=.5;neg.push({w:2,t:"sneaker alta con i corti appesantisce la gamba"})}
-  if(bot&&isK(bot,/felpa|tuta|jogger/i)&&sh&&isK(sh,/derby|oxford|chelsea|stringat|mocassin/i)){sc-=1;neg.push({w:3,t:"pantalone da tuta con scarpe da città"})}
-  if(sh&&/gel|running|dedicate/i.test(sh.name)&&occ!=="sport"){sc-=.5;neg.push({w:2,t:"scarpa da corsa fuori dal campo"})}
-  if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/chelsea|stival|boot/i)){sc+=.5;pos.push({w:2,t:"jeans a zampa sopra lo stivaletto, l'abbinamento giusto"})}
+  if(shorts&&t<20){sc-=1.5;neg.push({d:-1.5,w:3,t:`pantaloni corti a ${t} °C`})}
+  if(t>=26&&top&&isHeavy(top)){sc-=1.2;if(t>=30&&capV>6){capV=6;capWhy=`con maniche lunghe sopra i 30 °C il voto non supera 6`}neg.push({d:-1.2,w:3,t:`maniche lunghe e tessuto pesante a ${t} °C`})}
+  if(t>=28&&occ==="casual"&&bot&&isK(bot,/jeans/i)&&!shorts&&S.items.some(isShorts)){sc-=.6;neg.push({d:-.6,w:2,t:`jeans lunghi a ${t} °C, con i corti staresti meglio`})}
+  if(t>=28&&bot&&isK(bot,/felpa|jogger|tuta(?!.*bermuda)/i)&&!shorts){sc-=.8;neg.push({d:-.8,w:2,t:`pantalone in felpa con questo caldo`})}
+  if(top&&isShortSleeve(top)&&t<17&&!out){sc-=1;neg.push({d:-1,w:3,t:`maniche corte a ${t} °C`})}
+  if(shorts&&sh&&isK(sh,/chelsea|stival|boot|derby|oxford|stringat/i)){sc-=1.2;neg.push({d:-1.2,w:3,t:"stivaletti o scarpe formali con i pantaloni corti"})}
+  else if(shorts&&sh&&isK(sh,/sneaker|mocassin|loafer|espadrill|sandal/i)&&!isK(sh,/gel|running|mid\b|alta/i)){sc+=.3;pos.push({d:+.3,w:1,t:"scarpa bassa e pulita, quella giusta con i corti"})}
+  if(shorts&&sh&&isK(sh,/mid\b|alta|high/i)){sc-=.5;neg.push({d:-.5,w:2,t:"sneaker alta con i corti appesantisce la gamba"})}
+  if(bot&&isK(bot,/felpa|tuta|jogger/i)&&sh&&isK(sh,/derby|oxford|chelsea|stringat|mocassin/i)){sc-=1;neg.push({d:-1,w:3,t:"pantalone da tuta con scarpe da città"})}
+  if(sh&&/gel|running|dedicate/i.test(sh.name)&&occ!=="sport"){sc-=.5;neg.push({d:-.5,w:2,t:"scarpa da corsa fuori dal campo"})}
+  if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/chelsea|stival|boot/i)){sc+=.5;pos.push({d:+.5,w:2,t:"jeans a zampa sopra lo stivaletto, l'abbinamento giusto"})}
   else if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/sneaker/i)&&!isK(sh,/alta|mid\b/i))tips.push("Il flare rende di più con uno stivaletto: l'orlo deve coprire metà scarpa.");
-  if(bot&&isK(bot,/baggy|loose|wide/i)&&sh&&isK(sh,/derby|mocassin/i)){sc+=.3;pos.push({w:1,t:"pantalone ampio con scarpa importante, molto attuale"})}
+  if(bot&&isK(bot,/baggy|loose|wide/i)&&sh&&isK(sh,/derby|mocassin/i)){sc+=.3;pos.push({d:+.3,w:1,t:"pantalone ampio con scarpa importante, molto attuale"})}
   const warm=list.filter(i=>i.cat!=="shoes"&&["marrone","cammello"].includes(i.color));
-  if(warm.length&&sh&&sh.color==="nero"){sc-=.4;neg.push({w:1,t:"toni caldi con scarpe nere: meglio marrone o bordeaux"})}
-  if(t<18&&["autunno","inverno"].includes(seasonOf(today()))&&list.some(i=>i.cat!=="shoes"&&FAM.terra.includes(i.color))&&!acc.length){sc+=.2;pos.push({w:1,t:"toni terra, i colori di questa stagione"})}
+  if(warm.length&&sh&&sh.color==="nero"){sc-=.4;neg.push({d:-.4,w:1,t:"toni caldi con scarpe nere: meglio marrone o bordeaux"})}
+  if(t<18&&["autunno","inverno"].includes(seasonOf(today()))&&list.some(i=>i.cat!=="shoes"&&FAM.terra.includes(i.color))&&!acc.length){sc+=.2;pos.push({d:+.2,w:1,t:"toni terra, i colori di questa stagione"})}
   const clothCols=new Set(list.filter(i=>i.cat!=="shoes").map(i=>i.color));
-  if(uniq.length<=3){sc+=.2;pos.push({w:1,t:"non più di tre colori"})}
-  if(top&&bot&&top.cat==="top"&&lum(bot.color)<lum(top.color)-.15&&!shorts){sc+=.2;pos.push({w:1,t:"sotto più scuro di sopra, la figura resta ancorata"})}
-  if(top&&bot&&isK(top,/polo|rugby/i)&&isK(bot,/chino/i)){sc+=.2;pos.push({w:1,t:"polo e chino, un classico che non sbaglia"})}
+  if(uniq.length<=3){sc+=.2;pos.push({d:+.2,w:1,t:"non più di tre colori"})}
+  if(top&&bot&&top.cat==="top"&&lum(bot.color)<lum(top.color)-.15&&!shorts){sc+=.2;pos.push({d:+.2,w:1,t:"sotto più scuro di sopra, la figura resta ancorata"})}
+  if(top&&bot&&isK(top,/polo|rugby/i)&&isK(bot,/chino/i)){sc+=.2;pos.push({d:+.2,w:1,t:"polo e chino, un classico che non sbaglia"})}
   if(shorts)tips.push("Corti sopra il ginocchio, 3-4 dita: con l'orlo che tocca il ginocchio la gamba si accorcia.");
   if(shorts&&sh&&isK(sh,/sneaker/i))tips.push("Con i corti calzini invisibili, mai di spugna sopra la caviglia.");
   // gusti
   let lk=0,dk=0;for(let a=0;a<list.length;a++)for(let b=a+1;b<list.length;b++){const v=taste[pk(list[a].id,list[b].id)]||0;if(v>0)lk++;if(v<0)dk++}
-  if(lk){sc+=.4;pos.push({w:1,t:"riprende abbinamenti che ti sono piaciuti"})}
-  if(dk){sc-=1;neg.push({w:3,t:"contiene una coppia di capi che avevi bocciato"})}
+  if(lk){sc+=.4;pos.push({d:+.4,w:1,t:"riprende abbinamenti che ti sono piaciuti"})}
+  if(dk){sc-=1;neg.push({d:-1,w:3,t:"contiene una coppia di capi che avevi bocciato"})}
   // consigli pratici
   if(top&&isK(top,/camicia/i)&&bot){tips.push(occ==="casual"&&!out?"Camicia fuori solo se l'orlo arriva a metà patta, altrimenti dentro.":"Camicia dentro il pantalone, con la cintura in tono con le scarpe.")}
   if(top&&isK(top,/maglion|cardigan|girocollo/i)&&list.some(i=>isK(i,/camicia/i)))tips.push("Lascia uscire il colletto della camicia sopra il maglione.");
@@ -372,7 +378,9 @@ function ruleVerdict(list,t,occ,taste){
   else if(!P.length)giudizio=up(N)+": si può fare di meglio.";
   else giudizio=up(P[0])+", ma "+N+".";
   const note=[...neg.slice(1,2).map(x=>up(x.t)+"."),...tips].slice(0,3);
-  return {voto,giudizio,note,ritocco,raw:sc,src:"regole"};
+  const perche=[...pos,...neg].filter(x=>x.d).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).map(x=>({d:x.d,t:x.t}));
+  const capped=Math.round(sc)>voto?capWhy:null,floored=Math.round(sc)<voto;
+  return {voto,giudizio,note,ritocco,raw:sc,src:"regole",perche,base:5.5,tot:sc,capped,floored};
 }
 
 // ===== stylist IA (Claude, dal proprio account, solo dentro Claude) =====
@@ -420,7 +428,15 @@ Rispondi solo con un oggetto JSON in italiano, così:
   }catch(e){if(cur!==c)return;const m=aiFail(e);if(m===null)return;c.aiState=AI?"error":null;c.aiErr=m}
   if(tab==="oggi"&&!document.querySelector("#sheet .pane"))render();
 }
-function verdictHTML(v,label,foot){return `<div class="stylist" aria-live="polite"><span class="lbl">${label}</span><div class="sc">${v.voto?`<b>${v.voto}<small>/10</small></b>`:""}<q>${esc(v.giudizio)}</q></div>${v.note&&v.note.length?`<ul class="why">${v.note.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}${v.ritocco?`<p class="note"><span class="lbl">Il tocco finale</span><br>${esc(v.ritocco)}</p>`:""}${foot||""}</div>`}
+const num=x=>(Math.round(x*10)/10).toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1});
+function whyHTML(v){if(!v.perche)return "";
+  return `<div class="score"><span class="lbl">Perché ${v.voto}</span><ul>
+    <li><span>Si parte da</span><b>${num(v.base)}</b></li>
+    ${v.perche.map(x=>`<li class="${x.d>0?"up":"dn"}"><span>${esc(x.t.charAt(0).toUpperCase()+x.t.slice(1))}</span><b>${x.d>0?"+":"−"}${num(Math.abs(x.d))}</b></li>`).join("")}
+    <li class="tot"><span>Totale</span><b>${num(v.tot)}</b></li>
+    ${v.capped?`<li class="cap"><span>Tetto: ${esc(v.capped)}</span><b>${v.voto}</b></li>`:v.floored?`<li class="cap"><span>Voto minimo</span><b>${v.voto}</b></li>`:`<li class="cap"><span>Arrotondato</span><b>${v.voto}</b></li>`}
+  </ul></div>`}
+function verdictHTML(v,label,foot){return `<div class="stylist" aria-live="polite"><span class="lbl">${label}</span><div class="sc">${v.voto?`<b>${v.voto}<small>/10</small></b>`:""}<q>${esc(v.giudizio)}</q></div>${whyHTML(v)}${v.note&&v.note.length?`<ul class="why">${v.note.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}${v.ritocco?`<p class="note"><span class="lbl">Il tocco finale</span><br>${esc(v.ritocco)}</p>`:""}${foot||""}</div>`}
 function stylistHTML(c){
   const H='<span class="lbl">Il parere dello stylist</span>';
   if(!c.ai&&(!AI||c.aiState==="error"||c.aiState==="stale")&&c.rv){
