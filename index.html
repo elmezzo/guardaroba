@@ -78,6 +78,7 @@ section{display:flex;flex-direction:column;gap:14px}
 .frame{aspect-ratio:3/4;max-width:100%;background:var(--sunk);overflow:hidden;display:grid;place-items:center;position:relative}
 .frame img{width:100%;height:100%;object-fit:cover;display:block}
 .frame svg{width:58%;height:58%}
+.more summary{cursor:pointer;padding:14px 0;border-top:1px solid var(--line);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);list-style:none}.more summary::-webkit-details-marker{display:none}
 .flip{perspective:1400px;cursor:pointer;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 .flip .card{position:relative;aspect-ratio:3/4;transition:transform .7s cubic-bezier(.2,.7,.2,1);transform-style:preserve-3d}
 .flip.on .card{transform:rotateY(180deg)}
@@ -280,7 +281,7 @@ function ruleVerdict(list,t,occ,taste){
   // colori
   const fams=new Set(list.filter(i=>i.cat!=="shoes").map(i=>famOf(i.color)));
   const dd=list.filter(i=>i.color==="denim"&&i.cat!=="shoes").length>=2;
-  if(!dd&&fams.size===1&&!fams.has(undefined)&&list.length>=3){sc+=1;pos.push({w:3,t:`tono su tono nei ${[...fams][0]==="grigi"?"grigi":[...fams][0]==="terra"?"colori della terra":[...fams][0]}`})}
+  if(!dd&&fams.size===1&&!fams.has(undefined)&&list.length>=3){sc+=1;pos.push({w:3,t:`tono su tono nei ${[...fams][0]==="grigi"?"neri, bianchi e grigi":[...fams][0]==="terra"?"colori della terra":[...fams][0]}`})}
   else if(!acc.length){sc+=.5;pos.push({w:2,t:"palette tutta neutra"})}
   if(acc.length===1){const a=list.find(i=>i.color===acc[0]);if(a&&(a.cat==="top"||a.cat==="outer")){sc+=.5;pos.push({w:2,t:`un solo colore deciso, ${art(acc[0])}, vicino al viso`})}else{pos.push({w:1,t:`un solo colore deciso, ${art(acc[0])}`})}}
   if(uniq.length>=5){sc-=.8;neg.push({w:2,t:"troppi colori diversi"})}
@@ -308,7 +309,7 @@ function ruleVerdict(list,t,occ,taste){
   if(big.some(i=>i.cat==="top")&&big.some(i=>i.cat==="bottom")){sc-=.7;neg.push({w:2,t:"volumi ampi sia sopra sia sotto"})}
   else if(big.length&&slim.length){sc+=.3;pos.push({w:1,t:"un volume ampio bilanciato da un capo asciutto"})}
   // meteo e tessuti
-  if(t<16&&!out){sc-=1;neg.push({w:3,t:`a ${t} °C manca un capospalla`})}
+  if(t<16&&!out){if(S.items.some(i=>i.cat==="outer")){sc-=1;neg.push({w:3,t:`a ${t} °C manca un capospalla`})}else tips.unshift(`A ${t} °C serve un capospalla: aggiungine uno all'armadio e lo inserisco nelle proposte.`)}
   if(t>=24&&out){sc-=.8;neg.push({w:2,t:"il capospalla è di troppo con questo caldo"})}
   if(t<8&&list.some(i=>i.seasons.length===1&&i.seasons[0]==="estate")){sc-=.8;neg.push({w:2,t:"un capo estivo in una giornata fredda"})}
   if(t>=22&&list.some(i=>i.seasons.length&&i.seasons.every(s=>s==="inverno"))){sc-=.8;neg.push({w:2,t:"un capo da pieno inverno con questo caldo"})}
@@ -321,7 +322,7 @@ function ruleVerdict(list,t,occ,taste){
   else if(shorts&&sh&&isK(sh,/sneaker|mocassin|loafer|espadrill|sandal/i)&&!isK(sh,/gel|running|mid\b|alta/i)){sc+=.3;pos.push({w:1,t:"scarpa bassa e pulita, quella giusta con i corti"})}
   if(shorts&&sh&&isK(sh,/mid\b|alta|high/i)){sc-=.5;neg.push({w:2,t:"sneaker alta con i corti appesantisce la gamba"})}
   if(bot&&isK(bot,/felpa|tuta|jogger/i)&&sh&&isK(sh,/derby|oxford|chelsea|stringat|mocassin/i)){sc-=1;neg.push({w:3,t:"pantalone da tuta con scarpe da città"})}
-  if(sh&&isK(sh,/gel|running|dedicate/i)&&occ!=="sport"){sc-=.5;neg.push({w:2,t:"scarpa da corsa fuori dal campo"})}
+  if(sh&&/gel|running|dedicate/i.test(sh.name)&&occ!=="sport"){sc-=.5;neg.push({w:2,t:"scarpa da corsa fuori dal campo"})}
   if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/chelsea|stival|boot/i)){sc+=.5;pos.push({w:2,t:"jeans a zampa sopra lo stivaletto, l'abbinamento giusto"})}
   else if(bot&&isK(bot,/flare|bootcut/i)&&sh&&isK(sh,/sneaker/i)&&!isK(sh,/alta|mid\b/i))tips.push("Il flare rende di più con uno stivaletto: l'orlo deve coprire metà scarpa.");
   if(bot&&isK(bot,/baggy|loose|wide/i)&&sh&&isK(sh,/derby|mocassin/i)){sc+=.3;pos.push({w:1,t:"pantalone ampio con scarpa importante, molto attuale"})}
@@ -341,7 +342,7 @@ function ruleVerdict(list,t,occ,taste){
   // consigli pratici
   if(top&&isK(top,/camicia/i)&&bot){tips.push(occ==="casual"&&!out?"Camicia fuori solo se l'orlo arriva a metà patta, altrimenti dentro.":"Camicia dentro il pantalone, con la cintura in tono con le scarpe.")}
   if(top&&isK(top,/maglion|cardigan|girocollo/i)&&list.some(i=>isK(i,/camicia/i)))tips.push("Lascia uscire il colletto della camicia sopra il maglione.");
-  if(sh&&isK(sh,/sneaker/i)&&bot)tips.push("Orlo corto o un piccolo risvolto: il pantalone non deve appoggiarsi sulla sneaker.");
+  if(sh&&isK(sh,/sneaker/i)&&bot&&!isK(bot,/flare|bootcut|baggy|loose|wide/i))tips.push("Orlo corto o un piccolo risvolto: il pantalone non deve appoggiarsi sulla sneaker.");
   if(sh&&isK(sh,/derby|mocassin|stringat|oxford|chelsea|stival/i))tips.push("Calze in tono con il pantalone, non con le scarpe.");
   if(out&&isK(out,/cappotto/i))tips.push("Il cappotto deve coprire ciò che c'è sotto: almeno a metà coscia.");
   if(out&&isK(out,/blazer|giacca(?! di jeans)/i)&&bot&&isK(bot,/jeans/i))tips.push("Con il blazer, jeans scuro e senza strappi.");
@@ -605,6 +606,7 @@ function vLook(){
   <div class="opts">${fs.map(([k,v])=>`<label class="opt"><input type="radio" name="lf" value="${k}" ${lookF===k?"checked":""}>${v}</label>`).join("")}</div>
   ${ls.length?`<div class="lookbook">${ls.map(l=>`<button class="look" data-open="${l.id}">${lookFrame(l)}<span class="d"><b>${fmtShort(l.date)}</b>${l.ai&&l.ai.voto?`<span class="mark">${l.ai.voto}/10</span>`:""}${l.vote===1?'<span class="mark up">Preferito</span>':l.vote===-1?'<span class="mark dn">Bocciato</span>':""}</span><span class="note">${OCCS[l.occ]||""}${l.temp!=null?` · ${l.temp}°`:""}</span></button>`).join("")}</div>`:`<div class="empty"><h3>Ancora nessun look qui</h3><p class="note">Da "Oggi" scegli un outfit, indossalo e scatta una foto a figura intera allo specchio.</p></div>`}`;
 }
+const more=(arr,f,n=6)=>arr.slice(0,n).map(f).join("")+(arr.length>n?`<details class="more"><summary>Mostra tutti (${arr.length})</summary>${arr.slice(n).map(f).join("")}</details>`:"");
 function vStats(){
   const t=today(),N=S.items.length||1,used=new Set(S.looks.filter(l=>diff(l.date,t)<=30).flatMap(l=>l.items));
   const val=S.items.reduce((a,i)=>a+(+i.price||0),0);
@@ -613,11 +615,12 @@ function vStats(){
   const mx=Math.max(1,...cpw.map(x=>x.c));
   const th=i=>`<div class="th">${i.photo&&PH[i.photo]?img(i.photo):sil(i.cat,i.color)}</div>`;
   return `<header class="head"><span class="lbl">Uso dell'armadio</span><h1>Analisi</h1></header>
-  <div class="figs"><div class="fig"><b>${Math.round(used.size/N*100)}%</b><span>dei capi usati negli ultimi 30 giorni</span></div><div class="fig"><b>${idle.length}</b><span>capi fermi da oltre 60 giorni</span></div><div class="fig"><b>${eur(val)}</b><span>valore dell'armadio</span></div></div>
+  <div class="figs"><div class="fig"><b>${Math.round(used.size/N*100)}%</b><span>dei capi usati negli ultimi 30 giorni</span></div><div class="fig"><b>${idle.length}</b><span>capi mai messi o fermi da 60 giorni</span></div><div class="fig"><b>${eur(val)}</b><span>valore dell'armadio</span></div></div>
+  ${!S.looks.length?`<section><div class="empty"><h3>Ancora nessun dato</h3><p class="note">Ogni volta che premi "Lo indosso oggi" il look viene contato. Dopo qualche settimana qui vedi cosa usi davvero, cosa resta fermo e quanto ti costa ogni capo a utilizzo.</p></div></section>`:`
   <section><div><h2>Da rimettere in gioco</h2><p class="note">Mai indossati o fermi da più di 60 giorni. Proponili, oppure valuta se tenerli.</p></div>
-  ${idle.length?`<div class="list">${idle.map(i=>`<div class="li">${th(i)}<div class="tx"><div>${esc(i.name)}</div><div class="note">${CATS[i.cat]}</div></div><div class="num">${lastWorn(i.id)?diff(lastWorn(i.id),t)+" gg":"mai"}</div></div>`).join("")}</div>`:`<p class="muted">Indossi tutto con regolarità.</p>`}</section>
+  ${idle.length?`<div class="list">${more(idle,i=>`<div class="li">${th(i)}<div class="tx"><div>${esc(i.name)}</div><div class="note">${CATS[i.cat]}</div></div><div class="num">${lastWorn(i.id)?diff(lastWorn(i.id),t)+" gg":"mai"}</div></div>`)}</div>`:`<p class="muted">Indossi tutto con regolarità.</p>`}</section>
   <section><div><h2>Costo per utilizzo</h2><p class="note">Prezzo diviso il numero di volte che l'hai indossato. Più scende, più il capo ha reso.</p></div>
-  ${cpw.length?`<div class="list">${cpw.map(x=>`<div class="li">${th(x.i)}<div class="tx"><div>${esc(x.i.name)}</div><div class="meter"><i style="width:${Math.max(2,x.c/mx*100)}%"></i></div></div><div class="num">${eur(x.c)}<div class="note">${x.n} volte</div></div></div>`).join("")}</div>`:`<p class="muted">Inserisci il prezzo dei capi per vedere questo dato.</p>`}</section>`;
+  ${cpw.length?`<div class="list">${more(cpw,x=>`<div class="li">${th(x.i)}<div class="tx"><div>${esc(x.i.name)}</div><div class="meter"><i style="width:${Math.max(2,x.c/mx*100)}%"></i></div></div><div class="num">${eur(x.c)}<div class="note">${x.n} volte</div></div></div>`)}</div>`:`<p class="muted">Inserisci il prezzo dei capi per vedere questo dato.</p>`}</section>`}`;
 }
 
 function render(){
