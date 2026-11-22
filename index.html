@@ -69,6 +69,7 @@ section{display:flex;flex-direction:column;gap:14px}
 .opt:has(input:focus-visible){outline:1px solid var(--accent);outline-offset:3px}
 .temp{display:flex;align-items:center;gap:16px}
 .temp input{flex:1;min-width:0;accent-color:var(--fg)}
+.wx{margin-top:4px;font-size:.8rem;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px}.wx .link{font-size:inherit;color:var(--fg);text-decoration:underline;text-underline-offset:3px}
 .temp output{font:400 1.7rem/1 var(--display);min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
 .ctl{display:grid;gap:18px;padding:0 0 20px;border-bottom:1px solid var(--line)}
 .ctl .f{display:flex;flex-direction:column;gap:6px}
@@ -328,6 +329,8 @@ function ruleVerdict(list,t,occ,taste){
   if(t<8&&list.some(i=>i.seasons.length===1&&i.seasons[0]==="estate")){sc-=.8;neg.push({d:-.8,w:2,t:"un capo estivo in una giornata fredda"})}
   if(t>=22&&list.some(i=>i.seasons.length&&i.seasons.every(s=>s==="inverno"))){sc-=.8;neg.push({d:-.8,w:2,t:"un capo da pieno inverno con questo caldo"})}
   if(sh&&t<8&&isK(sh,/tela|canvas|sandal|espadrill/i)){sc-=.5;neg.push({d:-.5,w:1,t:"scarpe leggere per il freddo"})}
+  const wxr=wxToday();
+  if(wxr&&wxr.rain>=60&&S.prefs.manual!==today()){if(sh&&isK(sh,/scamosciat|suede|tela|canvas|espadrill/i)){sc-=.5;neg.push({d:-.5,w:2,t:`scarpe delicate con la pioggia prevista (${wxr.rain}%)`})}else tips.push(`Prevista pioggia (${wxr.rain}%): meglio scarpe in pelle liscia o gomma.`)}
   // regole classiche e tendenze
   const shorts=bot&&isShorts(bot);
   if(shorts&&t<20){sc-=1.5;neg.push({d:-1.5,w:3,t:`pantaloni corti a ${t} °C`})}
@@ -592,6 +595,11 @@ function generate(){
   const fbCats=[...fbUsed].map(c=>CATS[c].toLowerCase());if(fbCats.length){const buy=fbUsed.has("top")&&(occ==="lavoro"||occ==="elegante")?(t<24?" Una camicia bianca o azzurra e un blazer blu alzerebbero molto il voto.":" Una camicia di lino bianca o azzurra alzerebbe molto il voto."):fbUsed.has("shoes")&&occ!=="sport"?" Un paio di derby o mocassini marroni lo completerebbero.":"";best.notes=[{w:1,t:`Per "${OCCS[occ]}" non hai ancora capi adatti (${fbCats.join(", ")}): ho usato i più vicini che hai.${buy}`},...best.notes];if(best.rv&&buy)best.rv.note=[buy.trim(),...best.rv.note].slice(0,3)}
   cur={list:best.list,notes:best.notes,rv:best&&best.rv,needO,noO:needO&&!O.length,cands:pool.map(x=>({list:x.list,notes:x.notes})),aiState:AI?"queued":null};
 }
+function wxLine(){const w=wxToday();
+  if(!S.prefs.loc)return `<p class="note wx"><button class="link" id="wxgo">Prendi i gradi dal meteo di dove sei</button></p>`;
+  if(!w)return `<p class="note wx">Meteo non disponibile${wxBusy?"":` · <button class="link" id="wxr">Riprova</button>`}</p>`;
+  const c=WXC(w.code),wet=/pioggia|rovesci|temporali/.test(c),d=`Oggi ${w.min}°–${w.max}°, ${w.rain>=40?(wet?c:c+", pioggia")+` ${w.rain}%`:c}`;
+  return S.prefs.manual===today()?`<p class="note wx">${d} · a mano <button class="link" id="wxback">Usa il meteo</button></p>`:`<p class="note wx">${d} <button class="link" id="wxr">Aggiorna</button></p>`}
 function swap(k){
   const {temp:t,occ}=S.prefs,taste=pairTaste(),c=cur.list[k];
   const tl0=S.looks.find(l=>l.date===today()),wk=tl0?tl0.items.slice().sort().join(","):null;
@@ -625,7 +633,7 @@ function vOggi(){
   return `<header class="head"><span class="lbl">${fmtLong(today())}</span><h1>Cosa <em>indossare</em></h1></header>
   ${tl?`<section><span class="lbl">Il look di oggi</span><div class="today"><button class="look" data-open="${tl.id}" aria-label="Apri il look di oggi">${lookFrame(tl)}</button><div class="tx"><h3>${tl.items.map(getItem).filter(Boolean).map(i=>esc(i.name)).join(", ")}</h3>${tl.photo?"":`<button class="btn small" data-photo="${tl.id}">Aggiungi la foto</button>`}${voteHTML(tl)}<button class="link" data-del="${tl.id}">Elimina questo look</button></div></div></section>`:""}
   <section class="ctl">
-    <div class="f"><span class="lbl">Temperatura</span><div class="temp"><input type="range" id="temp" min="-5" max="38" value="${p.temp}" aria-label="Temperatura prevista in gradi"><output id="tout">${p.temp}°</output></div></div>
+    <div class="f"><span class="lbl">Temperatura</span><div class="temp"><input type="range" id="temp" min="-5" max="38" value="${p.temp}" aria-label="Temperatura prevista in gradi"><output id="tout">${p.temp}°</output></div>${wxLine()}</div>
     <div class="f"><span class="lbl">Occasione</span><div class="opts">${Object.entries(OCCS).map(([k,v])=>`<label class="opt"><input type="radio" name="occ" value="${k}" ${p.occ===k?"checked":""}>${v}</label>`).join("")}</div></div>
   </section>
   <section><div class="sec-h"><h2>${tl?"Un'alternativa":"La proposta"}</h2></div>${body}</section>`;
@@ -679,7 +687,10 @@ function bind(){
   $$("[data-del]").forEach(b=>b.onclick=()=>{if(b.dataset.a!=="1"){b.dataset.a="1";b.textContent="Tocca di nuovo per eliminare";setTimeout(()=>{if(b.isConnected){b.dataset.a="";b.textContent="Elimina questo look"}},4000);return}deleteLook(b.dataset.del)});
   $$("[data-vote]").forEach(b=>b.onclick=()=>vote(b.dataset.look,+b.dataset.vote));
   if(tab==="oggi"){
-    const r=$("#temp");if(r){r.oninput=()=>$("#tout").textContent=r.value+"°";r.onchange=()=>{S.prefs.temp=+r.value;save();shown.clear();cur=null;render()}}
+    const r=$("#temp");if(r){r.oninput=()=>$("#tout").textContent=r.value+"°";r.onchange=()=>{S.prefs.temp=+r.value;if(wxToday())S.prefs.manual=today();save();shown.clear();cur=null;render()}}
+    const wg=$("#wxgo");if(wg)wg.onclick=()=>{wg.disabled=true;wg.textContent="Leggo il meteo…";updateWx(true)};
+    const wr=$("#wxr");if(wr)wr.onclick=()=>{wr.disabled=true;wr.textContent="Aggiorno…";updateWx(true)};
+    const wb=$("#wxback");if(wb)wb.onclick=()=>{delete S.prefs.manual;applyWx();save();shown.clear();cur=null;render()};
     $$("input[name=occ]").forEach(x=>x.onchange=()=>{S.prefs.occ=x.value;save();shown.clear();cur=null;render()});
     $("#regen")&&($("#regen").onclick=()=>{aiCtl&&aiCtl.abort();generate();render()});
     $("#askAI")&&($("#askAI").onclick=()=>{cur.aiState="queued";render()});
@@ -856,6 +867,32 @@ async function restoreLooks(data,idMap){let n=0;if(!Array.isArray(data.looks))re
   return n}
 
 // ===== guardaroba di Alessandro, incluso nell'app =====
+// ===== meteo =====
+const WXC=c=>c==null?"":c===0?"sereno":c<=2?"poco nuvoloso":c===3?"nuvoloso":c<=48?"nebbia":c<=67?"pioggia":c<=77?"neve":c<=82?"rovesci":"temporali";
+let wxBusy=false;
+const wxToday=()=>{const w=S.prefs.wx;return w&&w.date===today()?w:null};
+async function fetchWx(lat,lon){
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=auto&forecast_days=1`;
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
+  try{const r=await fetch(u,{signal:ctl.signal,cache:"no-store"});if(!r.ok)throw 0;const j=await r.json();
+    const hrs=(j.hourly.time||[]).map((t,k)=>({h:+t.slice(11,13),v:j.hourly.temperature_2m[k],p:j.hourly.precipitation_probability[k]})).filter(x=>x.h>=9&&x.h<=20&&x.v!=null);
+    if(!hrs.length)throw 0;
+    const avg=hrs.reduce((a,x)=>a+x.v,0)/hrs.length,rain=Math.max(0,...hrs.map(x=>x.p||0));
+    return {date:today(),at:Date.now(),t:Math.round(avg),min:Math.round(j.daily.temperature_2m_min[0]),max:Math.round(j.daily.temperature_2m_max[0]),rain,code:j.daily.weather_code[0]}}
+  finally{clearTimeout(to)}}
+function getPos(){return new Promise((res,rej)=>{if(!navigator.geolocation)return rej(new Error("nogeo"));navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude}),e=>rej(e),{timeout:12000,maximumAge:6*3600e3,enableHighAccuracy:false})})}
+function applyWx(){const w=wxToday();if(!w||S.prefs.manual===today())return false;const t=Math.max(-5,Math.min(38,w.t));if(S.prefs.temp===t)return false;S.prefs.temp=t;return true}
+async function updateWx(askPos){
+  if(wxBusy)return;wxBusy=true;
+  try{
+    if(askPos||!S.prefs.loc){const pos=await getPos();S.prefs.loc={lat:+pos.lat.toFixed(3),lon:+pos.lon.toFixed(3)}}
+    const w=await fetchWx(S.prefs.loc.lat,S.prefs.loc.lon);S.prefs.wx=w;
+    const ch=applyWx();save();
+    if(!document.querySelector("#sheet .pane")){if(ch){cur=null;shown.clear()}render()}
+    if(askPos)toast(`Meteo di oggi: ${w.min}°–${w.max}°, uso ${S.prefs.temp}°`);
+  }catch(e){if(askPos)toast(e&&e.code===1?"Senza il permesso alla posizione non posso leggere il meteo: imposta i gradi a mano":"Non riesco a leggere il meteo adesso: imposta i gradi a mano")}
+  finally{wxBusy=false}}
+function maybeWx(){if(!S.prefs.loc)return;const w=S.prefs.wx;if(!w||w.date!==today()||Date.now()-w.at>2*3600e3)updateWx(false)}
 const SEED=2;
 async function seedWardrobe(){
   if((S.seedVer||0)>=SEED)return;
@@ -878,7 +915,7 @@ let tt;function toast(m){document.querySelectorAll(".toast").forEach(t=>t.remove
 
 document.querySelectorAll("nav.bar button").forEach(b=>b.onclick=()=>go(b.dataset.tab));
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
-let lastDay=today();document.addEventListener("visibilitychange",()=>{if(!document.hidden&&today()!==lastDay){lastDay=today();if(!document.querySelector("#sheet .pane")){cur=null;shown.clear();render()}}});
+let lastDay=today();document.addEventListener("visibilitychange",()=>{if(!document.hidden)maybeWx();if(!document.hidden&&today()!==lastDay){lastDay=today();if(!document.querySelector("#sheet .pane")){cur=null;shown.clear();render()}}});
 
 (async()=>{
   await DB.open();
@@ -890,7 +927,9 @@ let lastDay=today();document.addEventListener("visibilitychange",()=>{if(!docume
   cur=null;if((S.seedVer||0)>=SEED)render();
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   await seedWardrobe();
+  if(applyWx()){cur=null;render()}
   if(!document.getElementById("app").innerHTML)render();
+  maybeWx();
   initAI();
   try{if("serviceWorker" in navigator&&window.top===window)navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 })();
