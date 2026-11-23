@@ -893,14 +893,14 @@ async function updateWx(askPos){
   }catch(e){if(askPos)toast(e&&e.code===1?"Senza il permesso alla posizione non posso leggere il meteo: imposta i gradi a mano":"Non riesco a leggere il meteo adesso: imposta i gradi a mano")}
   finally{wxBusy=false}}
 function maybeWx(){if(!S.prefs.loc)return;const w=S.prefs.wx;if(!w||w.date!==today()||Date.now()-w.at>2*3600e3)updateWx(false)}
-const SEED=4;
+const SEED=5;
 async function seedWardrobe(){
   if((S.seedVer||0)>=SEED)return;
   let data;try{const r=await fetch("guardaroba.json?v="+SEED,{cache:"no-store"});if(!r.ok)return;data=await r.json()}catch(e){return}
   const arr=data&&Array.isArray(data.items)?data.items:null;if(!arr)return;
   if(S.items.length&&S.items.every(i=>i.example)){S.items=[];S.looks=S.looks.filter(l=>!l.example)}
-  for(const r of arr){if(!r||typeof r.was!=="string")continue;const it=S.items.find(i=>i.name.toLowerCase()===r.was.toLowerCase());if(!it)continue;
-    it.name=clip(r.name,60)||it.name;if(+r.price>0)it.price=+r.price;if(r.descr)it.descr=clip(r.descr,120);if(r.source)it.source=clip(r.source,500)}
+  for(const r of arr){if(!r||!r.was)continue;const was=(Array.isArray(r.was)?r.was:[r.was]).filter(x=>typeof x==="string").map(x=>x.toLowerCase());const it=S.items.find(i=>was.includes(i.name.toLowerCase()));if(!it)continue;
+    it.name=clip(r.name,60)||it.name;if(+r.price>0)it.price=+r.price;if(r.descr)it.descr=clip(r.descr,120);if(r.source)it.source=clip(r.source,500);if(COLORS[r.color])it.color=r.color}
   const {n}=await addItems(arr);
   S.seedVer=SEED;save();cur=null;render();if(n)toast(`${n} capi del tuo guardaroba caricati`);
 }
