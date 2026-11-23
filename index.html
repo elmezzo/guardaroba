@@ -895,7 +895,7 @@ async function updateWx(askPos){
   }catch(e){if(askPos)toast(e&&e.code===1?"Senza il permesso alla posizione non posso leggere il meteo: imposta i gradi a mano":"Non riesco a leggere il meteo adesso: imposta i gradi a mano")}
   finally{wxBusy=false}}
 function maybeWx(){if(!S.prefs.loc)return;const w=S.prefs.wx;if(!w||w.date!==today()||Date.now()-w.at>2*3600e3)updateWx(false)}
-const SEED=29;
+const SEED=30;
 async function seedWardrobe(){
   if((S.seedVer||0)>=SEED)return;
   let data;try{const r=await fetch("guardaroba.json?v="+SEED,{cache:"no-store"});if(!r.ok)return;data=await r.json()}catch(e){return}
