@@ -578,7 +578,7 @@ const pickTop=(a,n)=>a.map(i=>({i,k:fresh(i)+Math.random()*14})).sort((x,y)=>y.k
 function generate(){
   const {temp:t,occ}=S.prefs,taste=pairTaste();fbUsed=new Set();
   const tl0=S.looks.find(l=>l.date===today()),worn=new Set(tl0?tl0.items:[]),wornKey=tl0?tl0.items.slice().sort().join(","):null;
-  const T=pickTop(cands("top",t,occ),8),B=pickTop(cands("bottom",t,occ),8),D=pickTop(cands("dress",t,occ),6),Sh=pickTop(cands("shoes",t,occ),6),O=pickTop(cands("outer",t,occ),5);
+  const T=pickTop(cands("top",t,occ).filter(i=>!i.layer),8),B=pickTop(cands("bottom",t,occ),8),D=pickTop(cands("dress",t,occ),6),Sh=pickTop(cands("shoes",t,occ),6),O=pickTop(cands("outer",t,occ),5);
   const needO=t<16,bases=[];for(const a of T)for(const b of B)bases.push([a,b]);for(const d of D)bases.push([d]);
   if(occ==="casual"&&t>=17&&t<30){const Ly=pickTop(cands("top",t,occ,false).filter(i=>i.layer),4),Te=pickTop(cands("top",t,occ,false).filter(isTee),4);for(const a of Te)for(const l of Ly)for(const b of B.slice(0,5))bases.push([a,l,b])}
   const all=[];
@@ -604,7 +604,7 @@ function swap(k){
   const {temp:t,occ}=S.prefs,taste=pairTaste(),c=cur.list[k];
   const tl0=S.looks.find(l=>l.date===today()),wk=tl0?tl0.items.slice().sort().join(","):null;
   const lay0=layerOf(cur.list),role=c.cat!=="top"||!lay0?"":c===lay0?"layer":"base";
-  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id&&!cur.list.includes(i)&&(role==="layer"?i.layer:role==="base"?isTee(i):true)).map(i=>{const l=cur.list.slice();l[k]=i;if(wk&&l.map(x=>x.id).sort().join(",")===wk)return null;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
+  const opts=cands(c.cat,t,occ).filter(i=>i.id!==c.id&&!cur.list.includes(i)&&(role==="layer"?i.layer:role==="base"?isTee(i):!i.layer)).map(i=>{const l=cur.list.slice();l[k]=i;if(wk&&l.map(x=>x.id).sort().join(",")===wk)return null;const e=evaluate(l,taste);return e&&{l,e,f:e.s+ruleVerdict(l,t,occ,taste).raw*6}}).filter(Boolean).sort((a,b)=>b.f-a.f);
   if(!opts.length)return toast(`Nessun'altra scelta per "${CATS[c.cat]}" che stia bene con il resto`);
   const p=opts[Math.floor(Math.random()*Math.min(3,opts.length))];cur.list=p.l;cur.notes=p.e.notes;cur.rv=ruleVerdict(p.l,t,occ,taste);cur.cands=[{list:p.l,notes:p.e.notes}];if(cur.ai||cur.aiState){aiCtl&&aiCtl.abort();cur.ai=null;cur.aiState=AI?"stale":null}render();
 }
