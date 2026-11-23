@@ -550,7 +550,7 @@ const isShorts=i=>i.cat==="bottom"&&/bermuda|shorts?\b|pantaloncin|corti/i.test(
 const isShortSleeve=i=>i.cat==="top"&&/polo|t-?shirt|canotta|maniche corte/i.test(i.name)&&!/rugby|manica lunga|maniche lunghe/i.test(i.name+" "+(i.descr||""));
 const isTee=i=>i.cat==="top"&&!i.layer&&/t-?shirt|maglietta|canotta|\btee\b/i.test(i.name);
 const isSummer=()=>{const m=new Date().getMonth();return m>=5&&m<=8};
-const aloneOk=i=>!/canotta/i.test(i.name)||isSummer();
+const aloneOk=i=>!(i.under||/canotta/i.test(i.name))||isSummer();
 const layerOf=list=>{const tops=list.filter(i=>i.cat==="top");return tops.length>1?tops.find(i=>i.layer)||tops[1]:null};
 const isHeavy=i=>/manica lunga|maniche lunghe|rugby|felpa|flanella|cashmere|lana|dolcevita|maglion|velluto/i.test(i.name+" "+(i.descr||""));
 const warmOk=(i,t)=>isShorts(i)?t>=20:isShortSleeve(i)?t>=17:true;
@@ -837,7 +837,7 @@ async function addItems(arr){
     let photo=null;
     if(typeof r.photo==="string"&&r.photo.startsWith("data:image/")){try{const[h,d]=r.photo.split(","),bin=atob(d),u=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);photo=await savePhoto(new Blob([u],{type:h.slice(5).split(";")[0]}))}catch(e){}}
     const nid=uid();if(r.id)idMap[r.id]=nid;
-    S.items.push({id:nid,name,cat,color,seasons:seasons.length?seasons:[...SEASONS],occ:occ.length?occ:["casual"],price:+r.price>0?+r.price:"",descr:clip(r.descr||r.descrizione,120),photo,source:src,brand:clip(r.brand,40),...(r.layer==="aperta"&&cat==="top"?{layer:"aperta"}:{})});n++;
+    S.items.push({id:nid,name,cat,color,seasons:seasons.length?seasons:[...SEASONS],occ:occ.length?occ:["casual"],price:+r.price>0?+r.price:"",descr:clip(r.descr||r.descrizione,120),photo,source:src,brand:clip(r.brand,40),...(r.layer==="aperta"&&cat==="top"?{layer:"aperta"}:{}),...(r.under&&cat==="top"?{under:true}:{})});n++;
   }
   return {n,skip,idMap};
 }
@@ -895,7 +895,7 @@ async function updateWx(askPos){
   }catch(e){if(askPos)toast(e&&e.code===1?"Senza il permesso alla posizione non posso leggere il meteo: imposta i gradi a mano":"Non riesco a leggere il meteo adesso: imposta i gradi a mano")}
   finally{wxBusy=false}}
 function maybeWx(){if(!S.prefs.loc)return;const w=S.prefs.wx;if(!w||w.date!==today()||Date.now()-w.at>2*3600e3)updateWx(false)}
-const SEED=23;
+const SEED=24;
 async function seedWardrobe(){
   if((S.seedVer||0)>=SEED)return;
   let data;try{const r=await fetch("guardaroba.json?v="+SEED,{cache:"no-store"});if(!r.ok)return;data=await r.json()}catch(e){return}
